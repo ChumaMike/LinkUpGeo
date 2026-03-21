@@ -1,5 +1,35 @@
 venv/
+.venv/
+env/
 __pycache__/
+*.py[cod]
+*.egg-info/
+
 instance/
 .env
+*.env
 .DS_Store
+Thumbs.db
+
+# Database files
+*.db
+*.sqlite3
+
+# User uploads (store in cloud in production)
+src/static/uploads/
+
+# Flask-Migrate cache
+migrations/__pycache__/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Pytest
+.pytest_cache/
+htmlcov/
+.coverage
+
+# Logs
+*.log

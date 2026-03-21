@@ -1,68 +1,145 @@
 {% extends "base.html" %}
-
 {% block content %}
-<div class="position-relative">
-    <div id="map" style="height: 80vh; border-radius: 8px; border: 1px solid #ddd;"></div>
+<div class="row g-3">
 
-    <div class="card position-absolute top-0 end-0 m-3 p-3 shadow" style="z-index: 999; width: 200px; opacity: 0.9;">
-        <h6 class="fw-bold">Map Legend</h6>
-        <div class="d-flex align-items-center mb-2">
-            <i class="bi bi-geo-alt-fill text-success me-2 fs-5"></i>
-            <small>Verified Pro</small>
+    <!-- Filter Sidebar -->
+    <div class="col-md-3">
+        <div class="card shadow-sm border-0 p-3 sticky-top" style="top:80px;">
+            <h6 class="fw-bold mb-3"><i class="bi bi-funnel"></i> Filter Services</h6>
+
+            <div class="mb-3">
+                <label class="form-label small fw-semibold">Category</label>
+                <select id="filterCategory" class="form-select form-select-sm">
+                    <option value="all">All Categories</option>
+                    <option value="service">Services</option>
+                    <option value="house">Housing</option>
+                    <option value="job">Jobs</option>
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label small fw-semibold">Max Price: <span id="priceLabel">R2000</span></label>
+                <input type="range" id="filterPrice" class="form-range" min="0" max="2000" step="50" value="2000">
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label small fw-semibold">Radius: <span id="radiusLabel">50km</span></label>
+                <input type="range" id="filterRadius" class="form-range" min="5" max="50" step="5" value="50">
+            </div>
+
+            <div class="mb-3 form-check">
+                <input type="checkbox" class="form-check-input" id="filterVerified" checked>
+                <label class="form-check-label small" for="filterVerified">Verified only</label>
+            </div>
+
+            <button id="applyFilters" class="btn btn-primary btn-sm w-100">
+                <i class="bi bi-search"></i> Apply Filters
+            </button>
+
+            <hr>
+            <div class="text-center">
+                <small class="text-muted" id="resultCount">Loading pins...</small>
+            </div>
+            <div class="mt-2">
+                <small class="text-muted d-block"><i class="bi bi-geo-alt-fill text-success"></i> Verified Pro</small>
+                <small class="text-muted d-block"><i class="bi bi-geo-alt-fill text-primary"></i> Unverified</small>
+            </div>
         </div>
-        <div class="d-flex align-items-center mb-2">
-            <i class="bi bi-geo-alt-fill text-primary me-2 fs-5"></i>
-            <small>Unverified / Public</small>
-        </div>
-        <hr>
-        <small class="text-muted" style="font-size: 0.8em;">
-            Click any pin to see contact details and prices.
-        </small>
+    </div>
+
+    <!-- Map -->
+    <div class="col-md-9">
+        <div id="map" style="height:80vh;border-radius:8px;border:1px solid #ddd;"></div>
     </div>
 </div>
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
 <script>
     var map = L.map('map').setView([-26.2514, 27.8967], 13);
-
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap contributors'
     }).addTo(map);
 
-    var listings = {{ listings | tojson }};
+    var markersLayer = L.layerGroup().addTo(map);
 
-    listings.forEach(item => {
-        // Dynamic Icon Color based on Verification
-        var pinColor = item.is_verified ? 'green' : 'blue';
-        
-        // Use a custom HTML Icon (using Bootstrap Icons inside Leaflet!)
-        var iconHtml = `<i class="bi bi-geo-alt-fill text-${item.is_verified ? 'success' : 'primary'}" style="font-size: 2rem; text-shadow: 2px 2px 2px rgba(0,0,0,0.3);"></i>`;
-        
-        var customIcon = L.divIcon({
-            html: iconHtml,
-            className: 'dummy-class', // removes default white box
-            iconSize: [30, 42],
-            iconAnchor: [15, 42]
+    function renderListings(listings) {
+        markersLayer.clearLayers();
+        document.getElementById('resultCount').textContent = listings.length + ' result' + (listings.length !== 1 ? 's' : '');
+
+        listings.forEach(function(item) {
+            var lat = item.lat || item.latitude;
+            var lon = item.lon || item.longitude;
+            if (!lat || !lon) return;
+
+            var iconHtml = '<i class="bi bi-geo-alt-fill text-' + (item.is_verified ? 'success' : 'primary') + '" style="font-size:2rem;text-shadow:2px 2px 2px rgba(0,0,0,.3);"></i>';
+            var customIcon = L.divIcon({html: iconHtml, className: '', iconSize: [30,42], iconAnchor: [15,42]});
+
+            var badge = item.is_verified
+                ? '<span class="badge bg-success">Verified Pro</span>'
+                : '<span class="badge bg-secondary">Listing</span>';
+
+            var imgTag = item.image_url
+                ? '<img src="/static/' + item.image_url + '" style="width:100%;height:80px;object-fit:cover;border-radius:4px;margin-bottom:6px;">'
+                : '';
+
+            var stars = '';
+            var r = Math.round(item.rating || 0);
+            for (var i = 0; i < r; i++) stars += '<i class="bi bi-star-fill text-warning" style="font-size:.7rem;"></i>';
+            for (var i = r; i < 5; i++) stars += '<i class="bi bi-star text-warning" style="font-size:.7rem;"></i>';
+
+            var profileLink = item.provider_id
+                ? '<a href="/provider/' + item.provider_id + '" class="btn btn-sm btn-outline-secondary mt-1 w-100">View Profile</a>'
+                : '';
+
+            var marker = L.marker([lat, lon], {icon: customIcon}).addTo(markersLayer);
+            marker.bindPopup(
+                '<div style="min-width:160px;">' +
+                imgTag +
+                '<h6 class="fw-bold mb-1">' + item.title + '</h6>' +
+                badge + '<br>' +
+                stars + '<br>' +
+                '<div class="mt-1 text-muted">' + (item.price || '') + '</div>' +
+                '<a href="tel:' + (item.contact || '') + '" class="btn btn-sm btn-outline-success mt-2 w-100">' +
+                '<i class="bi bi-whatsapp"></i> Contact</a>' +
+                profileLink +
+                '</div>'
+            );
         });
+    }
 
-        var marker = L.marker([item.location.lat, item.location.lon], {icon: customIcon}).addTo(map);
-        
-        var badge = item.is_verified 
-            ? '<span class="badge bg-success">Verified Pro</span>' 
-            : '<span class="badge bg-secondary">Public Listing</span>';
+    function loadListings() {
+        var category = document.getElementById('filterCategory').value;
+        var maxPrice = document.getElementById('filterPrice').value;
+        var radius = document.getElementById('filterRadius').value;
+        var verified = document.getElementById('filterVerified').checked;
+        var center = map.getCenter();
 
-        marker.bindPopup(`
-            <div class="text-center">
-                <h6 class="fw-bold mb-1">${item.title}</h6>
-                ${badge}<br>
-                <div class="mt-2 text-muted">${item.price}</div>
-                <a href="tel:${item.contact}" class="btn btn-sm btn-outline-success mt-2">
-                    <i class="bi bi-whatsapp"></i> Contact
-                </a>
-            </div>
-        `);
+        var url = '/api/listings?category=' + category +
+                  '&max_price=' + maxPrice +
+                  '&radius=' + radius +
+                  '&verified=' + verified +
+                  '&lat=' + center.lat +
+                  '&lon=' + center.lng;
+
+        fetch(url)
+            .then(function(r) { return r.json(); })
+            .then(function(data) { renderListings(data); })
+            .catch(function(e) { console.error('Filter error', e); });
+    }
+
+    // Initial load with server-side data
+    var initialListings = {{ listings | tojson }};
+    renderListings(initialListings);
+
+    // Slider labels
+    document.getElementById('filterPrice').addEventListener('input', function() {
+        document.getElementById('priceLabel').textContent = 'R' + this.value;
     });
+    document.getElementById('filterRadius').addEventListener('input', function() {
+        document.getElementById('radiusLabel').textContent = this.value + 'km';
+    });
+
+    document.getElementById('applyFilters').addEventListener('click', loadListings);
 </script>
 {% endblock %}

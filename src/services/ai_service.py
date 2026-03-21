@@ -1,29 +1,31 @@
 import os
-import google.generativeai as genai
-from dotenv import load_dotenv
 import json
+import logging
+from google import genai
+from dotenv import load_dotenv
 
-# Load environment variables
 load_dotenv()
+logger = logging.getLogger(__name__)
+
 
 class AIService:
     def __init__(self):
-        # 1. Setup Google Gemini
         api_key = os.getenv("GEMINI_API_KEY")
         if not api_key:
-            print("⚠️ WARNING: GEMINI_API_KEY not found in .env")
-        
-        genai.configure(api_key=api_key)
-        
-        # 2. Use the Universal Model Alias (Safer than version numbers)
-        self.model = genai.GenerativeModel('gemini-flash-latest')
+            logger.warning("GEMINI_API_KEY not set — AI features will not work")
+        self._client = genai.Client(api_key=api_key) if api_key else None
+
+    def _generate(self, prompt: str) -> str:
+        if not self._client:
+            raise RuntimeError("Gemini client not configured")
+        response = self._client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=prompt,
+        )
+        return response.text
 
     def parse_intent(self, user_text, history=None):
-        """
-        Analyzes the message WITH context from history.
-        """
         try:
-            # Convert the list of messages into a string for the AI to read
             history_text = ""
             if history:
                 for msg in history:
@@ -31,61 +33,52 @@ class AIService:
                     history_text += f"{role}: {msg['text']}\n"
 
             prompt = f"""
-            You are 'LinkUp', a helpful, friendly automated assistant for a Kasi Service App.
-            Your goal is to help users find services (plumbers, jobs, rooms).
+You are 'LinkUp', a helpful, friendly automated assistant for a Kasi Service App.
+Your goal is to help users find services (plumbers, jobs, rooms).
 
-            CONVERSATION HISTORY:
-            {history_text}
+CONVERSATION HISTORY:
+{history_text}
 
-            CURRENT MESSAGE: "{user_text}"
-            
-            TASK:
-            Return a JSON object.
-            1. If the user greets (hi, hello, sawubona), intent = 'greeting'.
-            2. If the user asks for a service (I need x, find me y), intent = 'search_listings'.
-            3. If the user is just chatting (Thank you, that's cool), intent = 'chat'.
-            
-            JSON FORMAT:
-            {{
-                "intent": "search_listings" OR "greeting" OR "chat",
-                "category": "service/house/job",
-                "keywords": "extracted keywords",
-                "location": "extracted location",
-                "chat_response": "If intent is 'chat', write a friendly short reply here."
-            }}
-            """
-            
-            response = self.model.generate_content(prompt)
-            clean_text = response.text.strip().replace("```json", "").replace("```", "")
-            return json.loads(clean_text)
+CURRENT MESSAGE: "{user_text}"
+
+TASK:
+Return a JSON object.
+1. If the user greets (hi, hello, sawubona), intent = 'greeting'.
+2. If the user asks for a service (I need x, find me y), intent = 'search_listings'.
+3. If the user is just chatting (Thank you, that's cool), intent = 'chat'.
+
+JSON FORMAT:
+{{
+    "intent": "search_listings" OR "greeting" OR "chat",
+    "category": "service/house/job",
+    "keywords": "extracted keywords",
+    "location": "extracted location",
+    "chat_response": "If intent is 'chat', write a friendly short reply here."
+}}
+"""
+            text = self._generate(prompt)
+            clean = text.strip().replace("```json", "").replace("```", "")
+            return json.loads(clean)
 
         except Exception as e:
-            print(f"🧠 AI Brain Error: {e}")
+            logger.error("AI intent parse error: %s", e)
             return {"intent": "unknown"}
 
     def generate_keywords(self, title, category):
-        """
-        [NEW] Auto-tagging feature for the Dashboard.
-        Generates search tags for a new listing.
-        """
         try:
             prompt = f"""
-            Generate 5 comma-separated search synonyms for a service.
-            Title: "{title}"
-            Category: "{category}"
-            
-            Rules:
-            1. Return ONLY the words separated by commas.
-            2. No intro text, no markdown.
-            """
-            
-            response = self.model.generate_content(prompt)
-            return response.text.lower().strip()
+Generate 5 comma-separated search synonyms for a service.
+Title: "{title}"
+Category: "{category}"
+
+Rules:
+1. Return ONLY the words separated by commas.
+2. No intro text, no markdown.
+"""
+            return self._generate(prompt).lower().strip()
         except Exception as e:
-            print(f"⚠️ Tagging Failed: {e}")
+            logger.warning("AI keyword generation failed: %s", e)
             return title.lower()
 
-# --- INSTANCE CREATION ---
-# We create the single instance HERE, at the bottom.
-# This allows other files to say: "from src.services.ai_service import ai_brain"
+
 ai_brain = AIService()

@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row">
+    <!-- Provider Card -->
+    <div class="col-md-4 mb-4">
+        <div class="card shadow-sm border-0 text-center p-4">
+            {% if provider.profile_image %}
+                <img src="{{ url_for('static', filename=provider.profile_image) }}"
+                     class="rounded-circle mx-auto mb-3" style="width:100px;height:100px;object-fit:cover;" alt="Profile">
+            {% else %}
+                <i class="bi bi-person-circle display-1 text-secondary mb-3"></i>
+            {% endif %}
+
+            <h3 class="fw-bold">{{ provider.name }}</h3>
+            <p class="text-muted small">Member since {{ provider.created_at.strftime('%B %Y') }}</p>
+
+            <div class="mb-3">
+                <span class="badge bg-success me-1">Provider</span>
+                <span class="badge bg-primary">Verified</span>
+            </div>
+
+            <!-- Star rating -->
+            <div class="mb-2">
+                {% set full_stars = avg_rating | int %}
+                {% for i in range(full_stars) %}
+                    <i class="bi bi-star-fill text-warning"></i>
+                {% endfor %}
+                {% for i in range(5 - full_stars) %}
+                    <i class="bi bi-star text-warning"></i>
+                {% endfor %}
+                <small class="text-muted ms-1">{{ avg_rating }} ({{ review_count }} review{{ 's' if review_count != 1 }})</small>
+            </div>
+
+            <p class="text-muted small">{{ listings | length }} active service{{ 's' if listings | length != 1 }}</p>
+        </div>
+    </div>
+
+    <!-- Listings + Reviews -->
+    <div class="col-md-8">
+        <h4 class="fw-bold mb-3">Services Offered</h4>
+        {% if listings %}
+            <div class="row g-3 mb-4">
+                {% for listing in listings %}
+                <div class="col-md-6">
+                    <div class="card shadow-sm border-0 h-100">
+                        {% if listing.image_url %}
+                            <img src="{{ url_for('static', filename=listing.image_url) }}"
+                                 class="card-img-top" style="height:160px;object-fit:cover;" alt="{{ listing.title }}">
+                        {% endif %}
+                        <div class="card-body">
+                            <h6 class="fw-bold">{{ listing.title }}</h6>
+                            <p class="text-muted small mb-1">{{ listing.category | capitalize }} · {{ listing.address }}</p>
+                            <p class="text-success fw-bold mb-2">{{ listing.price }}</p>
+                            {% set full = listing.rating | int %}
+                            {% for i in range(full) %}<i class="bi bi-star-fill text-warning" style="font-size:.75rem;"></i>{% endfor %}
+                            {% for i in range(5 - full) %}<i class="bi bi-star text-warning" style="font-size:.75rem;"></i>{% endfor %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p class="text-muted">No active listings yet.</p>
+        {% endif %}
+
+        {% if recent_reviews %}
+        <h4 class="fw-bold mb-3">Recent Reviews</h4>
+        {% for review, listing_title in recent_reviews %}
+        <div class="card shadow-sm border-0 mb-2 p-3">
+            <div class="d-flex justify-content-between">
+                <span class="fw-semibold">{{ listing_title }}</span>
+                <small class="text-muted">{{ review.created_at.strftime('%d %b %Y') }}</small>
+            </div>
+            <div class="my-1">
+                {% for i in range(review.rating) %}<i class="bi bi-star-fill text-warning"></i>{% endfor %}
+                {% for i in range(5 - review.rating) %}<i class="bi bi-star text-muted"></i>{% endfor %}
+            </div>
+            {% if review.comment %}
+                <p class="text-muted small mb-0 fst-italic">"{{ review.comment }}"</p>
+            {% endif %}
+        </div>
+        {% endfor %}
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

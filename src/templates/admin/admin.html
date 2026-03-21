@@ -1,11 +1,10 @@
 {% extends "base.html" %}
-
 {% block content %}
 <div class="container-fluid py-4">
-    
+
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
-            <h2 class="fw-bold">⚡️ Admin Command Center</h2>
+            <h2 class="fw-bold">Admin Command Center</h2>
             <p class="text-muted">God Mode Active</p>
         </div>
         <a href="/admin/logout" class="btn btn-danger">
@@ -40,21 +39,21 @@
         </div>
     </div>
 
-    <ul class="nav nav-tabs mb-3" id="adminTabs" role="tablist">
+    <ul class="nav nav-tabs mb-3">
         <li class="nav-item">
-            <button class="nav-link active" id="listings-tab" data-bs-toggle="tab" data-bs-target="#listings" type="button">
-                📦 Manage Listings
+            <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#listings" type="button">
+                Manage Listings
             </button>
         </li>
         <li class="nav-item">
-            <button class="nav-link" id="users-tab" data-bs-toggle="tab" data-bs-target="#users" type="button">
-                👥 Manage Users
+            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#users" type="button">
+                Manage Users
             </button>
         </li>
     </ul>
 
-    <div class="tab-content" id="adminTabsContent">
-        
+    <div class="tab-content">
+
         <div class="tab-pane fade show active" id="listings">
             <div class="card shadow-sm border-0">
                 <div class="table-responsive">
@@ -77,21 +76,31 @@
                                 </td>
                                 <td><span class="badge bg-light text-dark">{{ item.category }}</span></td>
                                 <td>
-                                    <small class="text-muted fst-italic">{{ item.keywords[:30] }}...</small>
+                                    <small class="text-muted fst-italic">{{ (item.keywords or '')[:30] }}...</small>
                                 </td>
                                 <td>
                                     {% if item.is_verified %}
                                         <span class="badge bg-success">Verified</span>
                                     {% else %}
-                                        <a href="/admin/verify/{{ item.id }}" class="btn btn-sm btn-outline-success">
-                                            <i class="bi bi-check-lg"></i> Verify Now
-                                        </a>
+                                        <!-- POST-based verify -->
+                                        <form method="POST" action="/admin/verify/{{ item.id }}" style="display:inline;">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <button type="submit" class="btn btn-sm btn-outline-success">
+                                                <i class="bi bi-check-lg"></i> Verify
+                                            </button>
+                                        </form>
                                     {% endif %}
                                 </td>
                                 <td class="text-end">
-                                    <a href="/admin/delete_listing/{{ item.id }}" class="btn btn-sm btn-danger" onclick="return confirm('Delete this listing?');">
-                                        <i class="bi bi-trash"></i>
-                                    </a>
+                                    <!-- POST-based delete (CSRF safe) -->
+                                    <form method="POST" action="/admin/delete_listing/{{ item.id }}"
+                                          style="display:inline;"
+                                          onsubmit="return confirm('Delete this listing?');">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-sm btn-danger">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
                                 </td>
                             </tr>
                             {% endfor %}
@@ -116,20 +125,29 @@
                         <tbody>
                             {% for u in users %}
                             <tr>
-                                <td><span class="fw-bold">{{ u.name }}</span></td>
+                                <td>
+                                    <a href="{{ url_for('profile.view_profile', user_id=u.id) }}" class="fw-bold text-decoration-none">{{ u.name }}</a>
+                                </td>
                                 <td>{{ u.phone_number }}</td>
                                 <td>
                                     {% if u.role == 'admin' %}
                                         <span class="badge bg-danger">ADMIN</span>
+                                    {% elif u.role == 'provider' %}
+                                        <span class="badge bg-primary">Provider</span>
                                     {% else %}
-                                        <span class="badge bg-secondary">User</span>
+                                        <span class="badge bg-secondary">Customer</span>
                                     {% endif %}
                                 </td>
                                 <td class="text-end">
                                     {% if u.role != 'admin' %}
-                                    <a href="/admin/delete_user/{{ u.id }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Ban this user?');">
-                                        <i class="bi bi-person-x"></i> Ban
-                                    </a>
+                                    <form method="POST" action="/admin/delete_user/{{ u.id }}"
+                                          style="display:inline;"
+                                          onsubmit="return confirm('Remove this user?');">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">
+                                            <i class="bi bi-person-x"></i> Remove
+                                        </button>
+                                    </form>
                                     {% endif %}
                                 </td>
                             </tr>

@@ -1,58 +1,82 @@
+import logging
 from flask import Blueprint, request, redirect, url_for, flash
 from flask_login import login_required, current_user
-from src.models.listing_model import db, JobRequest, Listing
 from geopy.geocoders import Nominatim
-import random
 
+from src.models.listing_model import db, JobRequest, Listing
+from src.services.notification_service import notification_service
+
+logger = logging.getLogger(__name__)
 jobs_bp = Blueprint('jobs', __name__, url_prefix='/jobs')
+
+VALID_CATEGORIES = {'service', 'house', 'job'}
+
 
 @jobs_bp.route("/create", methods=["POST"])
 @login_required
 def create():
-    category = request.form.get("category")
-    description = request.form.get("description")
-    location_text = request.form.get("location")
-    
-    # 1. CALCULATE COORDINATES ONCE (The "Freeze" Logic)
-    lat, lon = -26.2514, 27.8967 # Default Soweto
+    category = request.form.get("category", "").strip().lower()
+    description = request.form.get("description", "").strip()
+    location_text = request.form.get("location", "").strip()
+
+    # Input validation
+    if category not in VALID_CATEGORIES:
+        flash("Invalid category. Choose service, house, or job.", "error")
+        return redirect(url_for("web.dashboard"))
+    if len(description) < 10 or len(description) > 500:
+        flash("Description must be between 10 and 500 characters.", "error")
+        return redirect(url_for("web.dashboard"))
+    if not location_text:
+        flash("Location is required.", "error")
+        return redirect(url_for("web.dashboard"))
+
+    # Geocode once — stored permanently
+    lat, lon = -26.2514, 27.8967
     try:
-        # Try to find real address
         geolocator = Nominatim(user_agent="linkup_geo_app")
-        loc = geolocator.geocode(f"{location_text}, Soweto, South Africa")
+        loc = geolocator.geocode(f"{location_text}, South Africa")
         if loc:
             lat = loc.latitude
             lon = loc.longitude
         else:
-            # If address not found, Fuzz it slightly ONCE so it doesn't overlap perfectly
-            lat += random.uniform(-0.01, 0.01)
-            lon += random.uniform(-0.01, 0.01)
-    except:
-        # If internet fails, just fuzz the default
-        lat += random.uniform(-0.01, 0.01)
-        lon += random.uniform(-0.01, 0.01)
+            # Deterministic jitter so the default pin doesn't move on reload
+            seed = hash(location_text) % 1000
+            lat += seed / 50000.0
+            lon += seed / 50000.0
+    except Exception as e:
+        logger.warning("Geocoding failed for job location '%s': %s", location_text, e)
 
     new_job = JobRequest(
         customer_id=current_user.id,
         category=category,
         description=description,
         location=location_text,
-        latitude=lat,   # <--- Saved forever
-        longitude=lon   # <--- Saved forever
+        latitude=lat,
+        longitude=lon,
     )
     db.session.add(new_job)
     db.session.commit()
-    
-    # 2. Broadcast Logic
-    # (Finding providers and simulating WhatsApp)
-    potential_matches = Listing.query.filter(Listing.category.ilike(f"%{category}%")).all()
-    provider_phones = set(l.contact for l in potential_matches)
-    
-    print(f"\n📢 --- JOB BROADCAST #{new_job.id} ---")
-    if provider_phones:
-        for phone in provider_phones:
-            print(f"📲 Alerting {phone}: New {category} job in {location}")
-        flash(f"Alerted {len(provider_phones)} providers!", "success")
+    logger.info("Job request %d created by user %d", new_job.id, current_user.id)
+
+    # Real Twilio broadcast to matching providers
+    potential_matches = Listing.query.filter(
+        Listing.category.ilike(f"%{category}%"),
+        Listing.is_verified == True,
+        Listing.deleted_at == None,
+    ).all()
+    provider_phones = {l.contact for l in potential_matches if l.contact}
+
+    sent = notification_service.broadcast_job(new_job, provider_phones)
+
+    if sent > 0:
+        flash(f"Request posted! {sent} provider(s) notified via WhatsApp.", "success")
+    elif provider_phones:
+        flash(f"Request saved. Attempting to notify {len(provider_phones)} provider(s).", "warning")
     else:
-        flash("Request saved. Waiting for providers.", "warning")
-        
+        flash("Request saved. Waiting for providers in your area.", "warning")
+
+    # Update notification count
+    new_job.notifications_sent = sent
+    db.session.commit()
+
     return redirect(url_for("web.dashboard"))

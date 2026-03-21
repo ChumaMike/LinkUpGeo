@@ -1,25 +1,27 @@
 {% extends "base.html" %}
-
 {% block content %}
 <div class="container-fluid">
     <div class="row">
-        
+
+        <!-- Sidebar -->
         <div class="col-md-3 mb-4">
             <div class="card text-center p-4 shadow-sm border-0">
-                <div class="mb-3">
-                    <i class="bi bi-person-circle display-1 text-secondary"></i>
-                </div>
-                <h3>{{ user.name }}</h3>
-                <p class="text-muted">{{ user.phone_number }}</p>
+                {% if user.profile_image %}
+                    <img src="{{ url_for('static', filename=user.profile_image) }}"
+                         class="rounded-circle mx-auto mb-3" style="width:80px;height:80px;object-fit:cover;" alt="Profile">
+                {% else %}
+                    <i class="bi bi-person-circle display-1 text-secondary mb-2"></i>
+                {% endif %}
+                <h4 class="fw-bold mb-0">{{ user.name }}</h4>
+                <p class="text-muted small">{{ user.phone_number }}</p>
                 <div>
                     <span class="badge bg-primary">{{ user.role.upper() }}</span>
-                    <span class="badge bg-success">VERIFIED</span>
                 </div>
             </div>
         </div>
 
+        <!-- Main content -->
         <div class="col-md-9">
-            
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h2>My Dashboard</h2>
                 <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addListingModal">
@@ -27,69 +29,99 @@
                 </button>
             </div>
 
+            <!-- Map -->
             <div class="card shadow-sm mb-4 border-0">
                 <div class="card-header bg-white fw-bold">
                     <i class="bi bi-geo-alt"></i> Live Service Map
                 </div>
                 <div class="card-body p-0">
-                    <div id="map" style="height: 350px; width: 100%;"></div>
+                    <div id="map" style="height:350px;width:100%;"></div>
                 </div>
             </div>
 
-            <div class="card shadow-sm border-0">
+            <!-- Listings Table -->
+            <div class="card shadow-sm border-0 mb-4">
                 <div class="card-header bg-white fw-bold">
-                    <i class="bi bi-list-check"></i> Active Listings
+                    <i class="bi bi-list-check"></i> My Listings
                 </div>
-                
                 {% if listings %}
-                    <div class="table-responsive">
-                        <table class="table table-hover align-middle mb-0">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>Service</th>
-                                    <th>Price</th>
-                                    <th>Status</th>
-                                    <th class="text-end">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for item in listings %}
-                                <tr>
-                                    <td>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Service</th>
+                                <th>Price</th>
+                                <th>Rating</th>
+                                <th>Status</th>
+                                <th class="text-end">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in listings %}
+                            <tr>
+                                <td>
+                                    {% if item.image_url %}
+                                        <img src="{{ url_for('static', filename=item.image_url) }}"
+                                             style="width:40px;height:40px;object-fit:cover;border-radius:6px;" class="me-2" alt="">
+                                    {% endif %}
+                                    <div class="d-inline-block">
                                         <div class="fw-bold">{{ item.title }}</div>
-                                        <small class="text-muted">{{ item.category|capitalize }} • {{ item.address }}</small>
-                                    </td>
-                                    <td>
-                                        <span class="text-success fw-bold">{{ item.price }}</span>
-                                    </td>
-                                    <td>
-                                        {% if item.is_verified %}
-                                            <span class="badge bg-success bg-opacity-10 text-success border border-success">Live</span>
-                                        {% else %}
-                                            <span class="badge bg-warning bg-opacity-10 text-warning border border-warning">Pending</span>
-                                        {% endif %}
-                                    </td>
-                                    <td class="text-end">
-                                        <a href="/listings/edit/{{ item.id }}" class="btn btn-sm btn-outline-secondary">
-                                            <i class="bi bi-pencil"></i> Edit
-                                        </a>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
+                                        <small class="text-muted">{{ item.category | capitalize }} · {{ item.address }}</small>
+                                    </div>
+                                </td>
+                                <td><span class="text-success fw-bold">{{ item.price }}</span></td>
+                                <td>
+                                    {% set stars = item.rating | int %}
+                                    {% for i in range(stars) %}<i class="bi bi-star-fill text-warning" style="font-size:.75rem;"></i>{% endfor %}
+                                    {% for i in range(5 - stars) %}<i class="bi bi-star text-muted" style="font-size:.75rem;"></i>{% endfor %}
+                                    <small class="text-muted"> {{ item.rating }}</small>
+                                </td>
+                                <td>
+                                    {% if item.is_verified %}
+                                        <span class="badge bg-success bg-opacity-10 text-success border border-success">Live</span>
+                                    {% else %}
+                                        <span class="badge bg-warning bg-opacity-10 text-warning border border-warning">Pending</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end">
+                                    <a href="/listings/edit/{{ item.id }}" class="btn btn-sm btn-outline-secondary">
+                                        <i class="bi bi-pencil"></i> Edit
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
                 {% else %}
-                    <div class="p-5 text-center text-muted">
-                        <i class="bi bi-inbox display-4"></i>
-                        <p class="mt-3">You haven't posted any services yet.</p>
-                    </div>
+                <div class="p-5 text-center text-muted">
+                    <i class="bi bi-inbox display-4"></i>
+                    <p class="mt-3">No listings yet. Add your first service above.</p>
+                </div>
                 {% endif %}
             </div>
+
+            <!-- Leads -->
+            {% if leads %}
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-white fw-bold">
+                    <i class="bi bi-telephone"></i> Recent Leads
+                </div>
+                <ul class="list-group list-group-flush">
+                    {% for lead in leads %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <span>{{ lead.customer_phone }}</span>
+                        <span class="badge bg-secondary">{{ lead.status }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
         </div>
     </div>
 </div>
 
+<!-- Add Listing Modal -->
 <div class="modal fade" id="addListingModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -97,11 +129,12 @@
                 <h5 class="modal-title">Post a New Service</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form action="/listings/add" method="POST">
+            <form action="/listings/add" method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label class="form-label">Service Title</label>
-                        <input type="text" name="title" class="form-control" placeholder="e.g. Expert Plumbing" required>
+                        <label class="form-label">Service Title <small class="text-muted">(5–100 chars)</small></label>
+                        <input type="text" name="title" class="form-control" placeholder="e.g. Expert Plumbing Services" required minlength="5" maxlength="100">
                     </div>
                     <div class="row">
                         <div class="col-md-6 mb-3">
@@ -114,78 +147,63 @@
                         </div>
                         <div class="col-md-6 mb-3">
                             <label class="form-label">Price</label>
-                            <input type="text" name="price" class="form-control" placeholder="e.g. R450" required>
+                            <input type="text" name="price" class="form-control" placeholder="e.g. R450/hr" required>
                         </div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Location / Address</label>
                         <input type="text" name="address" class="form-control" placeholder="e.g. Maponya Mall, Soweto" required>
-                        <small class="text-muted">We will put a pin here on the map.</small>
+                        <small class="text-muted">We'll pin this on the map.</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Photo <small class="text-muted">(optional, max 2MB)</small></label>
+                        <input type="file" name="image" class="form-control" accept=".jpg,.jpeg,.png,.webp">
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Post Live</button>
+                    <button type="submit" class="btn btn-primary">Submit for Review</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
 
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
 <script>
-    // 1. Initialize Map
-    // Ensure the container "map" exists (It is in your code, so this should work)
     var map = L.map('map').setView([-26.2514, 27.8967], 12);
-
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap contributors'
+        attribution: '© OpenStreetMap'
     }).addTo(map);
 
     var blueIcon = new L.Icon({
         iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
         shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-        iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
+        iconSize: [25,41], iconAnchor: [12,41], popupAnchor: [1,-34], shadowSize: [41,41]
     });
-
     var redIcon = new L.Icon({
         iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
         shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-        iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
+        iconSize: [25,41], iconAnchor: [12,41], popupAnchor: [1,-34], shadowSize: [41,41]
     });
 
-    // --- SAFETY FIX: ADD default([]) ---
     var myListings = {{ listings | tojson | default([]) }};
-    
-    if (myListings.length > 0) {
-        myListings.forEach(function(item) {
-            if(item.latitude && item.longitude){
-                L.marker([item.latitude, item.longitude], {icon: blueIcon})
-                .addTo(map)
-                .bindPopup(`<b>🏠 My Shop: ${item.title}</b><br>Status: Live`);
-            }
-        });
-    }
+    myListings.forEach(function(item) {
+        if (item.latitude && item.longitude) {
+            L.marker([item.latitude, item.longitude], {icon: blueIcon})
+             .addTo(map)
+             .bindPopup('<b>' + item.title + '</b><br>Status: ' + (item.is_verified ? 'Live' : 'Pending'));
+        }
+    });
 
-    // --- SAFETY FIX: ADD default([]) ---
     var opportunities = {{ job_opportunities | tojson | default([]) }};
-    
-    if (opportunities.length > 0) {
-        opportunities.forEach(function(job) {
-            if(job.lat && job.lon){
-                L.marker([job.lat, job.lon], {icon: redIcon})
-                .addTo(map)
-                .bindPopup(`
-                    <div class="text-center">
-                        <b class="text-danger">💰 NEW LEAD</b><br>
-                        Need: ${job.category}<br>
-                        <i>"${job.description}"</i>
-                    </div>
-                `);
-            }
-        });
-    }
+    opportunities.forEach(function(job) {
+        if (job.lat && job.lon) {
+            L.marker([job.lat, job.lon], {icon: redIcon})
+             .addTo(map)
+             .bindPopup('<b>New Lead</b><br>Need: ' + job.category + '<br><i>' + job.description + '</i>');
+        }
+    });
 </script>
 {% endblock %}

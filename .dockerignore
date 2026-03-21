@@ -1,4 +1,15 @@
 venv/
+.venv/
 __pycache__/
-.git/
+*.pyc
+*.pyo
+*.db
+*.sqlite3
 .env
+.git/
+.gitignore
+src/static/uploads/
+migrations/
+.pytest_cache/
+tests/
+*.log

@@ -1,5 +1,9 @@
+import logging
 import requests
 from config import Config
+
+logger = logging.getLogger(__name__)
+
 
 class WeatherService:
     BASE_URL = "http://api.openweathermap.org/data/2.5/weather"
@@ -41,5 +45,5 @@ class WeatherService:
                 
         except requests.exceptions.RequestException as e:
             # Log the error in a real app (print for now)
-            print(f"Weather API Error: {e}")
+            logger.error("Weather API error: %s", e)
             return "Connection error. Please try again later."
